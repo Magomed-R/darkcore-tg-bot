@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "node-telegram-bot-api": "^0.63.0",
+    "nodemon": "^3.0.1"
+  },
+  "type": "module",
+  "name": "ddna-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon index.js"
+  },
+  "author": "Magomed-R",
+  "license": "ISC",
+  "description": ""
+}
