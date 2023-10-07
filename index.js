@@ -80,7 +80,7 @@ function getInlineKeyboard(userId) {
     let result = [];
 
     for (let i = 0; i < groups.length; i++) {
-        result.push([{ text: groups[i].text, url: "t.me/" + groups[i].url }]);
+        result.push([{ text: groups[i], url: "t.me/" + groups[i] }]);
 
         if (i == groups.length - 1) {
             result.push([{ text: "✅Проверить", callback_data: "checksub " + userId }]);
