@@ -5,6 +5,18 @@ import TelegramBot from "node-telegram-bot-api";
 
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
 
+import mongoose from "mongoose";
+import chalk from "chalk";
+
+mongoose
+    .connect(`mongodb+srv://${process.env.MONGO_USERNAME}:${process.env.MONGO_PASSWORD}@cluster.dvfjqpc.mongodb.net/darkcore`)
+    .then((res) => console.log(chalk.bgGreen.bold("Connected to DB")))
+    .catch((error) => console.log(error));
+
+import Group from "./Models/Group.js";
+import Button from "./Models/Button.js";
+import Category from "./Models/Category.js";
+
 bot.on("polling_error", console.log);
 
 bot.setMyCommands([
@@ -14,52 +26,28 @@ bot.setMyCommands([
     },
 ]);
 
-let groups = ["DarkCoreNews", "DarkCoreAds", "DarkCoreBlackList", "DarkCoreStories"];
-let buttons = [
-    {
-        text: "📰Новостник",
-        url: "t.me/DarkCoreNews",
-    },
+async function getGroups() {
+    let groups = await Group.find();
+    groups = groups.map((el) => el.group);
+    return groups;
+}
 
-    {
-        text: "🧭Путеводитель",
-        url: "t.me/DarkCoreAds",
-    },
+async function getButtons() {
+    let buttons = await Button.find().sort({ order: -1 });
 
-    {
-        text: "ℹ️Истории / Интервью",
-        url: "t.me/DarkCoreStories",
-    },
-
-    {
-        text: "💬Чат",
-        url: "t.me/blackmoneyproject_chat",
-    },
-
-    {
-        text: "🏴BlackList",
-        url: "t.me/DarkCoreBlackList",
-    },
-
-    // [
-    //     {
-    //         text: "Услуги",
-    //         callback_data: "",
-    //     },
-    // ],
-
-    {
-        text: "👨‍💻Тех. Поддержка",
-        url: "t.me/PaymentBM",
-    },
-
-    {
+    buttons.push({
         text: "📋Каталог DarkCore",
         callback_data: "catalog",
-    },
-];
+    });
+
+    return buttons;
+}
+
+// let groups = getGroups();
+// let buttons = getButtons();
 
 async function checkSubscribe(userId) {
+    let groups = await getGroups();
     for (let i = 0; i < groups.length; i++) {
         try {
             let pass = await bot.getChatMember("@" + groups[i], userId);
@@ -76,8 +64,10 @@ async function checkSubscribe(userId) {
     return true;
 }
 
-function getInlineKeyboard(userId) {
+async function getInlineKeyboard(userId) {
     let result = [];
+    let groups = await getGroups();
+    console.log(groups);
 
     for (let i = 0; i < groups.length; i++) {
         result.push([{ text: groups[i], url: "t.me/" + groups[i] }]);
@@ -90,13 +80,34 @@ function getInlineKeyboard(userId) {
     return result;
 }
 
-function getKeyboard() {
+async function getKeyboard() {
     let result = [];
     let temp = [];
+    let buttons = await getButtons();
 
     for (let i = 0; i < buttons.length; i++) {
         temp.push({ text: buttons[i].text });
         if (i % 2 == 1 && i != 0) {
+            result.push(temp);
+            temp = [];
+        } else if (buttons.length - 1 == i) {
+            result.push(temp);
+        }
+    }
+
+    return result;
+}
+
+async function getCatalog() {
+    let result = [];
+    let temp = [];
+    let buttons = await Category.find();
+
+    for (let i = 0; i < buttons.length; i++) {
+        let button = buttons[i]
+
+        temp.push({ text: button.title, callback_data: `catalog ${button._id}`});
+        if (i % 3 == 2 && i != 0) {
             result.push(temp);
             temp = [];
         } else if (buttons.length - 1 == i) {
@@ -113,13 +124,14 @@ bot.on("message", async (message) => {
     let text = message.text;
     let chatId = message.chat.id;
     let userId = message.from.id;
+    let buttons = await getButtons();
 
-    if (!(await checkSubscribe(message.from.id))) {
+    if (!(await checkSubscribe(userId))) {
         bot.deleteMessage(chatId, message.message_id);
 
         return bot.sendMessage(chatId, "Для начала вам необходимо подписаться на каналы", {
             reply_markup: {
-                inline_keyboard: getInlineKeyboard(userId),
+                inline_keyboard: await getInlineKeyboard(userId),
             },
         });
     }
@@ -130,7 +142,7 @@ bot.on("message", async (message) => {
         try {
             return bot.sendMessage(chatId, "📃Меню", {
                 reply_markup: {
-                    keyboard: getKeyboard(),
+                    keyboard: await getKeyboard(),
                 },
             });
         } catch (error) {
@@ -138,28 +150,22 @@ bot.on("message", async (message) => {
         }
     }
 
+    bot.deleteMessage(chatId, message.message_id);
+
     for (let i = 0; i < buttons.length; i++) {
-        if (buttons[i].callback_data) {
-            if (buttons[i].callback_data == "catalog") {
-                bot.sendMessage(chatId, "Каталог", {
+        let button = buttons[i];
+
+        if (button?.callback_data) {
+            if (text == "📋Каталог DarkCore") {
+                bot.sendMessage(chatId, "Доступные категории", {
                     reply_markup: {
-                        inline_keyboard: [
-                            [
-                                {
-                                    text: "Здесь будет список",
-                                    callback_data: "data",
-                                },
-                            ],
-                        ],
+                        inline_keyboard: await getCatalog(),
                     },
                 });
             }
-            return
-        }
-
-        if (text == buttons[i].text) {
-            bot.deleteMessage(chatId, message.message_id);
-            bot.sendMessage(chatId, `<a href="${buttons[i]?.url}">${buttons[i].text}</a>`, { parse_mode: "HTML" });
+            return;
+        } else if (text == button?.text) {
+            bot.sendMessage(chatId, button.url);
             return;
         }
     }
@@ -168,10 +174,10 @@ bot.on("message", async (message) => {
 bot.on("callback_query", async (message) => {
     let chatId = message.message.chat.id;
     let data = message.data.split(" ")[0];
-    let userId = message.data.split(" ")[1];
+    let subData = message.data.split(" ")[1];
 
     if (data == "checksub") {
-        if (await checkSubscribe(userId)) {
+        if (await checkSubscribe(subData)) {
             bot.sendMessage(chatId, "✅Готово!");
             bot.deleteMessage(chatId, message.message.message_id);
         } else {
@@ -181,17 +187,8 @@ bot.on("callback_query", async (message) => {
     }
 
     if (data == "catalog") {
-        bot.sendMessage(chatId, "Каталог", {
-            reply_markup: {
-                inline_keyboard: [
-                    [
-                        {
-                            text: "Здесь будет список",
-                            callback_data: "data",
-                        },
-                    ],
-                ],
-            },
-        });
+        let catalog = await Category.find();
+        
+        bot.sendMessage(chatId, catalog.find((el) => el._id == subData).callback)
     }
 });
