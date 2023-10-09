@@ -33,7 +33,7 @@ async function getGroups() {
 }
 
 async function getButtons() {
-    let buttons = await Button.find().sort({ order: -1 });
+    let buttons = await Button.find().sort({ order: 1 });
 
     buttons.push({
         text: "📋Каталог DarkCore",
