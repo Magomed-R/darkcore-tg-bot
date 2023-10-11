@@ -101,12 +101,12 @@ async function getKeyboard() {
 async function getCatalog() {
     let result = [];
     let temp = [];
-    let buttons = await Category.find();
+    let buttons = await Category.find().sort({ order: 1 });
 
     for (let i = 0; i < buttons.length; i++) {
-        let button = buttons[i]
+        let button = buttons[i];
 
-        temp.push({ text: button.title, callback_data: `catalog ${button._id}`});
+        temp.push({ text: button.title, callback_data: `catalog ${button._id}` });
         if (i % 3 == 2 && i != 0) {
             result.push(temp);
             temp = [];
@@ -187,8 +187,8 @@ bot.on("callback_query", async (message) => {
     }
 
     if (data == "catalog") {
-        let catalog = await Category.find();
-        
-        bot.sendMessage(chatId, catalog.find((el) => el._id == subData).callback)
+        let catalog = await Category.findOne({ _id: subData });
+
+        bot.sendMessage(chatId, catalog.callback);
     }
 });
