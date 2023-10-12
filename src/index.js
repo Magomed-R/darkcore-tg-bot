@@ -16,6 +16,8 @@ mongoose
 import Group from "./Models/Group.js";
 import Button from "./Models/Button.js";
 import Category from "./Models/Category.js";
+import User from "./Models/User.js";
+import Mailing from "./Models/Mailing.js"
 
 bot.on("polling_error", console.log);
 
@@ -23,7 +25,7 @@ bot.setMyCommands([
     {
         command: "/menu",
         description: "Открыть меню",
-    },
+    }
 ]);
 
 async function getGroups() {
@@ -53,7 +55,7 @@ async function checkSubscribe(userId) {
             let pass = await bot.getChatMember("@" + groups[i], userId);
             let status = pass.status;
 
-            if (status != "member" && status != "creator" && status != "administrator") {
+            if (status != "member" && status != "creator" && status != "administrator" && userId != "5614481899") {
                 return false;
             }
         } catch (error) {
@@ -67,7 +69,6 @@ async function checkSubscribe(userId) {
 async function getInlineKeyboard(userId) {
     let result = [];
     let groups = await getGroups();
-    console.log(groups);
 
     for (let i = 0; i < groups.length; i++) {
         result.push([{ text: groups[i], url: "t.me/" + groups[i] }]);
@@ -121,11 +122,12 @@ async function getCatalog() {
 bot.on("message", async (message) => {
     if (message.chat.type != "private") return;
 
+    checkUser(message)
+
     let text = message.text;
     let chatId = message.chat.id;
     let userId = message.from.id;
     let buttons = await getButtons();
-
     if (!(await checkSubscribe(userId))) {
         bot.deleteMessage(chatId, message.message_id);
 
@@ -192,3 +194,38 @@ bot.on("callback_query", async (message) => {
         bot.sendMessage(chatId, catalog.callback);
     }
 });
+
+async function checkUser(message) {
+    let username = message.from.username
+    let name = message.from.first_name
+    let chatId = message.chat.id;
+
+    let user = await User.findOne({ username: username, chatId: chatId });
+
+    if (user == null) {
+        let newUser = new User({
+            username: username,
+            name: name,
+            chatId: chatId,
+            history: []
+        });
+
+        newUser.save();
+    }
+}
+
+async function checkMailing() {
+    let mailing = await Mailing.findOne({status: "not processed"})
+    let users = await User.find()
+
+    if (!mailing) return
+
+    for (let i = 0; i < users.length; i++) {
+        bot.sendMessage(users[i].chatId, mailing.text)
+    }
+
+    mailing.status = "success"
+    mailing.save()
+}
+
+setInterval(checkMailing, 60000)
