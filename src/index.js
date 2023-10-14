@@ -162,7 +162,7 @@ bot.on("message", async (message) => {
                 bot.sendMessage(chatId, "Доступные категории", {
                     reply_markup: {
                         inline_keyboard: await getCatalog(),
-                    },
+                    }
                 });
             }
             return;
@@ -191,7 +191,9 @@ bot.on("callback_query", async (message) => {
     if (data == "catalog") {
         let catalog = await Category.findOne({ _id: subData });
 
-        bot.sendMessage(chatId, catalog.callback);
+        bot.sendMessage(chatId, catalog.callback, {
+            disable_web_page_preview: true
+        });
     }
 });
 
